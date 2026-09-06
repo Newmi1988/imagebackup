@@ -48,7 +48,7 @@ The system is powered in the field by a high-output power bank and utilizes the 
    - **Automatic:** Plug in your SD card reader and USB-C SSD. The system auto-detects the connected drives and immediately begins the backup.
    - **Manual:** Use the **START BACKUP** button on the web dashboard to trigger or retry a backup without re-inserting media.
 5. **Control in Progress:** You can tap the **STOP BACKUP** button at any time during copying or verification to abort safely.
-6. **Safe to Disconnect:** After copying, a bit-accurate file size verification pass runs. When the screen updates to `100% Erfolgreich Verifiziert`, it is safe to unplug your media. If errors occur, a structured JSONL log file (`backup_log.jsonl`) is created inside the backup folder on your SSD.
+6. **Safe to Disconnect:** After copying, a bit-accurate file size verification pass runs. When the screen updates to `100% Successfully Verified`, it is safe to unplug your media. If errors occur, a structured JSONL log file (`backup_log.jsonl`) is created inside the backup folder on your SSD.
 
 ---
 

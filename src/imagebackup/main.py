@@ -17,15 +17,15 @@ from flask import Flask, render_template_string, jsonify
 import argparse
 from pythonjsonlogger.json import JsonFormatter
 
-# --- Pfad-Konfiguration (Standardwerte) ---
+# --- Path configuration (default values) ---
 DEFAULT_SOURCE_DIR = "/media/usb0"
 DEFAULT_DEST_BASE = "/media/usb1"
 
-# --- Globale Status-Variablen ---
+# --- Global status variables ---
 status_data = {
     "phase": "IDLE",
-    "line1": "Warte auf Medien...",
-    "line2": "SD & SSD einstecken",
+    "line1": "Waiting for media...",
+    "line2": "Insert SD & SSD",
     "progress": 0,
     "active": False,
     "media_ready": False,
@@ -56,7 +56,7 @@ logger = logging.getLogger("imagebackup")
 
 app = Flask(__name__)
 
-# --- HTML-Oberfläche für dein Smartphone (Minimalistisch Schwarz/Weiß) ---
+# --- HTML interface for your smartphone (Minimalist Black/White) ---
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html>
@@ -138,7 +138,7 @@ HTML_TEMPLATE = """
 <body>
     <div class="container">
         <h1 id="phase">WAITING</h1>
-        <p id="line1">Lade...</p>
+        <p id="line1">Loading...</p>
         <p id="line2">...</p>
         <div class="progress-box">
             <div id="bar" class="progress-bar"></div>
@@ -194,7 +194,7 @@ def get_transfer_list(source_dir):
     return file_list, total_size
 
 def backup_worker(source_dir, dest_base):
-    """Der eigentliche Backup-Prozess läuft in einem eigenen Thread."""
+    """The actual backup process runs in a dedicated thread."""
     global status_data
     media_previously_connected = False
 
@@ -214,12 +214,12 @@ def backup_worker(source_dir, dest_base):
             stop_requested.clear()
             media_previously_connected = True
 
-            status_data.update({"phase": "SYSTEM SCAN", "line1": "Analysiere Daten...", "line2": "Bitte warten...", "progress": 0, "active": True})
+            status_data.update({"phase": "SYSTEM SCAN", "line1": "Analyzing data...", "line2": "Please wait...", "progress": 0, "active": True})
             time.sleep(2)
             
             files_to_copy, total_size = get_transfer_list(source_dir)
             if not files_to_copy:
-                status_data.update({"phase": "ABBRUCH", "line1": "Keine kompatiblen Fotos", "line2": "auf SD-Karte gefunden.", "progress": 0, "active": False})
+                status_data.update({"phase": "ABORTED", "line1": "No compatible photos", "line2": "found on SD card.", "progress": 0, "active": False})
                 time.sleep(5)
                 continue
 
@@ -235,7 +235,7 @@ def backup_worker(source_dir, dest_base):
             copied_records = []
             aborted = False
             
-            # 1. Kopier-Schleife (0% - 50%)
+            # 1. Copy loop (0% - 50%)
             for index, (src_file, root, file) in enumerate(files_to_copy):
                 if stop_requested.is_set():
                     aborted = True
@@ -252,7 +252,7 @@ def backup_worker(source_dir, dest_base):
                     
                 progress_pct = int((copied_size / total_size) * 50) if total_size > 0 else 0
                 short_name = file if len(file) < 22 else file[:19] + "..."
-                status_data.update({"phase": "1/2 KOPIEREN", "line1": f"Datei: {index+1}/{total_files}", "line2": short_name, "progress": progress_pct, "active": True})
+                status_data.update({"phase": "1/2 COPYING", "line1": f"File: {index+1}/{total_files}", "line2": short_name, "progress": progress_pct, "active": True})
                 
                 try:
                     shutil.copy2(src_file, dest_dir)
@@ -270,9 +270,9 @@ def backup_worker(source_dir, dest_base):
                     with open(log_file_path, "a") as log:
                         log.write(json.dumps(err_event) + "\n")
 
-            # 2. Verifizierungs-Schleife (50% - 100%)
+            # 2. Verification loop (50% - 100%)
             if not aborted:
-                status_data.update({"phase": "2/2 VERIFIZIERUNG", "line1": "Starte Datenabgleich...", "line2": "Bitte warten...", "progress": 50, "active": True})
+                status_data.update({"phase": "2/2 VERIFICATION", "line1": "Starting data verification...", "line2": "Please wait...", "progress": 50, "active": True})
                 time.sleep(1)
                 
                 for index, (src, dest, expected_size) in enumerate(copied_records):
@@ -284,11 +284,11 @@ def backup_worker(source_dir, dest_base):
                     progress_pct = 50 + int((index / len(copied_records)) * 50) if copied_records else 100
                     short_name = os.path.basename(src)
                     short_name = short_name if len(short_name) < 22 else short_name[:19] + "..."
-                    status_data.update({"phase": "2/2 VERIFIZIERUNG", "line1": f"Prüfung: {index+1}/{len(copied_records)}", "line2": short_name, "progress": progress_pct, "active": True})
+                    status_data.update({"phase": "2/2 VERIFICATION", "line1": f"Verifying: {index+1}/{len(copied_records)}", "line2": short_name, "progress": progress_pct, "active": True})
                     
                     try:
                         if not os.path.exists(dest) or os.path.getsize(dest) != expected_size:
-                            raise ValueError("Größenfehler")
+                            raise ValueError("Size mismatch")
                     except Exception as e:
                         verification_errors += 1
                         err_event = {
@@ -301,20 +301,20 @@ def backup_worker(source_dir, dest_base):
                         with open(log_file_path, "a") as log:
                             log.write(json.dumps(err_event) + "\n")
 
-            # Fertig / Gestoppt
+            # Finished / Stopped
             if aborted:
-                status_data.update({"phase": "GESTOPPT", "line1": "Backup abgebrochen", "line2": "Vorgang durch Benutzer beendet.", "progress": status_data.get("progress", 0), "active": False})
+                status_data.update({"phase": "STOPPED", "line1": "Backup aborted", "line2": "Process terminated by user.", "progress": status_data.get("progress", 0), "active": False})
             else:
                 total_issues = copy_errors + verification_errors
                 if total_issues > 0:
-                    status_data.update({"phase": "WARNUNG", "line1": f"Fehler aufgetreten: {total_issues}", "line2": "Logdatei auf SSD prüfen!", "progress": 100, "active": False})
+                    status_data.update({"phase": "WARNING", "line1": f"Errors occurred: {total_issues}", "line2": "Check log file on SSD!", "progress": 100, "active": False})
                 else:
-                    status_data.update({"phase": "ERFOLG", "line1": "100% Erfolgreich Verifiziert", "line2": "Speicher sicher trennen.", "progress": 100, "active": False})
+                    status_data.update({"phase": "SUCCESS", "line1": "100% Successfully Verified", "line2": "Safe to disconnect storage.", "progress": 100, "active": False})
 
         elif not media_present:
             media_previously_connected = False
             start_requested.clear()
-            status_data.update({"phase": "READY TO BACKUP", "line1": "Warte auf Medien...", "line2": "SD & SSD einstecken.", "progress": 0, "active": False})
+            status_data.update({"phase": "READY TO BACKUP", "line1": "Waiting for media...", "line2": "Insert SD & SSD.", "progress": 0, "active": False})
 
         time.sleep(1)
 
@@ -351,9 +351,9 @@ def main():
     setup_logging()
     args = parse_args()
 
-    # Startet den Backup-Überwacher in einem eigenen Thread im Hintergrund
+    # Starts the backup monitor in a separate background thread
     threading.Thread(target=backup_worker, args=(args.source, args.dest), daemon=True).start()
-    # Startet den Webserver, erreichbar im ganzen Netzwerk
+    # Starts the web server, accessible across the network
     app.run(host=args.host, port=args.port, debug=False)
 
 
