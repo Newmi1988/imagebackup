@@ -1,4 +1,3 @@
-import argparse
 import importlib
 import sys
 import tempfile
@@ -23,16 +22,17 @@ class TransferListTests(unittest.TestCase):
             files, total_size = imagebackup.get_transfer_list(source)
 
         self.assertEqual(total_size, 6)
-        self.assertEqual({path.name for path, _, _ in files}, {"photo.JPG", "raw.CR2"})
+        self.assertEqual({Path(path).name for path, _, _ in files}, {"photo.JPG", "raw.CR2"})
 
-    def test_skips_files_that_disappear_before_size_can_be_read(self):
+    def test_keeps_file_record_when_size_cannot_be_read(self):
         with tempfile.TemporaryDirectory() as source:
             photo = Path(source) / "photo.jpg"
             photo.write_bytes(b"data")
             with patch.object(imagebackup.os.path, "getsize", side_effect=OSError):
                 files, total_size = imagebackup.get_transfer_list(source)
 
-        self.assertEqual(files, [])
+        self.assertEqual(len(files), 1)
+        self.assertEqual(Path(files[0][0]).name, "photo.jpg")
         self.assertEqual(total_size, 0)
 
 
