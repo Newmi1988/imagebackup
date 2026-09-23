@@ -12,6 +12,11 @@ dependencies = [
     "python-json-logger>=4.0.0",
 ]
 
+[dependency-groups]
+dev = [
+    "pytest>=8.3.5",
+]
+
 [project.scripts]
 imagebackup = "imagebackup:main"
 
