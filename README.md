@@ -89,6 +89,11 @@ uv run imagebackup
 uv run src/imagebackup/main.py
 ```
 
+Run the unit tests with pytest:
+```bash
+uv run --group dev pytest
+```
+
 ### Command-Line Arguments
 ```text
 usage: imagebackup [-h] [--source SOURCE] [--dest DEST] [--port PORT] [--host HOST]
@@ -176,5 +181,4 @@ su - pi -c "/home/pi/.local/bin/imagebackup" &
 * **Structured JSON Logging:** Native JSON logs with `python-json-logger` and per-run `.jsonl` failure reports.
 * **Power Efficient:** Headless operation eliminates display power draw, keeping battery consumption minimal.
 * **Universal File Handling:** Seamlessly parses common RAW photography formats (`.cr2`, `.nef`, `.arw`, `.dng`) along with standard `.jpg` / `.jpeg` files.
-
 
