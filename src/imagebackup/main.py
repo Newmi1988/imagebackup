@@ -128,8 +128,7 @@ def backup_worker(source_dir, dest_base):
                 time.sleep(5)
                 continue
 
-            timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-            target_folder = os.path.join(dest_base, f"Backup_{timestamp}")
+            target_folder = dest_base
             os.makedirs(target_folder, exist_ok=True)
             log_file_path = os.path.join(target_folder, "backup_log.jsonl")
             
@@ -152,8 +151,15 @@ def backup_worker(source_dir, dest_base):
                 os.makedirs(dest_dir, exist_ok=True)
                 dest_file = os.path.join(dest_dir, file)
                 
-                try: file_size = os.path.getsize(src_file)
-                except OSError: continue
+                try:
+                    file_size = os.path.getsize(src_file)
+                except OSError:
+                    continue
+
+                if os.path.exists(dest_file) and os.path.getsize(dest_file) == file_size:
+                    copied_size += file_size
+                    logger.info("Skipping already existing file: %s", dest_file)
+                    continue
                     
                 progress_pct = int((copied_size / total_size) * 50) if total_size > 0 else 0
                 short_name = file if len(file) < 22 else file[:19] + "..."

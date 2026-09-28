@@ -4,7 +4,6 @@ from pathlib import Path
 
 import pytest
 
-
 imagebackup = importlib.import_module("imagebackup.main")
 
 
@@ -122,3 +121,46 @@ def test_stop_requires_an_active_backup_and_sets_stop_event(client):
 
     assert response.status_code == 200
     assert imagebackup.stop_requested.is_set()
+
+
+def test_backup_worker_skips_existing_files_and_preserves_folder_structure(tmp_path, monkeypatch):
+    source = tmp_path / "source"
+    dest = tmp_path / "dest"
+
+    # Create Sony camera style folder structure: e.g., 10030405
+    sony_dir = source / "10030405"
+    sony_dir.mkdir(parents=True)
+    file1 = sony_dir / "DSC0001.JPG"
+    file2 = sony_dir / "DSC0002.ARW"
+    file1.write_bytes(b"content1")
+    file2.write_bytes(b"content2")
+
+    # Destination already has file1 with identical content and size
+    dest_sony_dir = dest / "10030405"
+    dest_sony_dir.mkdir(parents=True)
+    dest_file1 = dest_sony_dir / "DSC0001.JPG"
+    dest_file1.write_bytes(b"content1")
+    original_mtime = dest_file1.stat().st_mtime_ns
+
+    # Monkeypatch time.sleep to avoid delays and exit after 1 run
+    call_count = 0
+    def fake_sleep(duration):
+        nonlocal call_count
+        call_count += 1
+        if call_count >= 5:
+            raise StopIteration("Break worker loop")
+
+    monkeypatch.setattr(imagebackup.time, "sleep", fake_sleep)
+    imagebackup.start_requested.set()
+
+    with pytest.raises(StopIteration, match="Break worker loop"):
+        imagebackup.backup_worker(str(source), str(dest))
+
+    # file2 should have been copied
+    assert (dest / "10030405" / "DSC0002.ARW").exists()
+    assert (dest / "10030405" / "DSC0002.ARW").read_bytes() == b"content2"
+
+    # file1 should have been skipped, maintaining its previous mtime
+    assert dest_file1.stat().st_mtime_ns == original_mtime
+    assert imagebackup.status_data["phase"] == "SUCCESS"
+
